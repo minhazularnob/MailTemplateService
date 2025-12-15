@@ -17,7 +17,7 @@
         <p>Your approval link has expired. Please contact HR for a new link.</p>
     </div>
 
-    <div class="wrapper" id="wrapperId">
+    <div class="wrapper" id="wrapperId" style="display: none;">
 
         <div class="header">
             <h2>Promotion Approval Request</h2>
@@ -67,7 +67,7 @@
     <script src="../Library/jquery/jquery-3.6.0.min.js"></script>
     <script>
         const baseUrl = "{BaseUrl}";
-        const incrementCode = "{incrementCode}";
+        const incrementCode = "{IncrementCode}";
 
         $(document).ready(function () {
             $.ajax({
@@ -84,13 +84,15 @@
                         $("#wrapperId").hide();
                         $("#tokenExpiredDiv").show();
                     }
+                    else {
+                        $("#wrapperId").show();
+                    }
                 }
             });
         });
 
         // LOGIN
         $("#btnLogin").click(function () {
-
             let userId = $("#txtUserId").val();
             let password = $("#txtPassword").val();
 
@@ -140,12 +142,33 @@
 
         // APPROVE / REJECT
         function updatePromotionStatus(status, element) {
+            debugger;
 
             $('.btn').css('opacity', '0.5').css('pointer-events', 'none');
             $(element).text("Processing...");
 
             $.ajax({
+                type: "POST",
+                async: false,
+                url: baseUrl + "/WebServices/HRIS/PromotionHistoryService.asmx/GetTokenStatus",
+                contentType: "application/json; charset=utf-8",
+                dataType: "json",
+                data: JSON.stringify({
+                    token: $('#token').val()
+                }),
+                success: function (response) {
+                    let data = response.d;
+                    if (data.ResponseCode == 0) {
+                        $("#wrapperId").hide();
+                        $("#tokenExpiredDiv").show();
+                        return;
+                    }
+                }
+            });
+
+            $.ajax({
                 type: 'POST',
+                async: false,
                 url: baseUrl + '/WebServices/HRIS/IncrementService.asmx/UpdateIncrementStatusForApproverFromMail',
                 data: JSON.stringify({
                     IP_ui64_incrementCode: incrementCode,
