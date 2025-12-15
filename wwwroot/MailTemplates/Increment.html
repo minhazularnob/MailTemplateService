@@ -1,0 +1,175 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Increment Approval Request</title>
+    <link href="../Styles/styles.css" rel="stylesheet" />
+</head>
+<body>
+
+    <!-- Token Expired -->
+    <div id="tokenExpiredDiv"
+         style="display:none; padding:20px; margin-top:20px;
+                border:1px solid #dc3545; background:#ffe6e6;
+                color:#b30000; border-radius:5px;">
+        <h3>Link Expired</h3>
+        <p>Your approval link has expired. Please contact HR for a new link.</p>
+    </div>
+
+    <div class="wrapper" id="wrapperId">
+
+        <div class="header">
+            <h2>Promotion Approval Request</h2>
+        </div>
+
+        <div class="content">
+
+            <p>Dear {ApproverName},</p>
+            <p>An Increment request requires your approval. Details are given below:</p>
+
+            <table class="promotion-details">
+                <tr><th>Employee Name</th><td>{EmployeeName}</td></tr>
+                <tr><th>Employee ID</th><td>{EmployeeId}</td></tr>
+                <tr><th>Previous Gross salary</th><td>{PreviousGross}</td></tr>
+                <tr><th>Proposed Gross Salary</th><td>{ProposedGross}</td></tr>
+                <tr><th>Effective From</th><td>{EffectiveFrom}</td></tr>
+            </table>
+
+            <input type="hidden" id="employeeCodeHidden" value="{EmployeeCode}">
+            <input type="hidden" id="token" value="{Token}">
+
+            <!-- Login Box -->
+            <div class="login-box" id="loginSection">
+                <h3>Login</h3>
+
+                <label>User ID</label>
+                <input type="text" id="txtUserId" placeholder="Enter User ID">
+
+                <label>Password</label>
+                <input type="password" id="txtPassword" placeholder="Enter Password">
+
+                <button id="btnLogin">Login</button>
+            </div>
+
+            <div id="actionSectionContainer"></div>
+
+            <p>For any queries, contact HR department.</p>
+            <p>Regards,<br>HR Department</p>
+        </div>
+
+        <div class="footer">
+            This is an automated message. Please do not reply.<br>
+            © 2025 Silkways Card and Printings Ltd.
+        </div>
+    </div>
+
+    <script src="../Library/jquery/jquery-3.6.0.min.js"></script>
+    <script>
+        const baseUrl = "{BaseUrl}";
+        const incrementCode = "{incrementCode}";
+
+        $(document).ready(function () {
+            $.ajax({
+                type: "POST",
+                url: baseUrl + "/WebServices/HRIS/IncrementService.asmx/GetTokenStatus",
+                contentType: "application/json; charset=utf-8",
+                dataType: "json",
+                data: JSON.stringify({
+                    token: $('#token').val()
+                }),
+                success: function (response) {
+                    let data = response.d;
+                    if (data.ResponseCode == 0) {
+                        $("#wrapperId").hide();
+                        $("#tokenExpiredDiv").show();
+                    }
+                }
+            });
+        });
+
+        // LOGIN
+        $("#btnLogin").click(function () {
+
+            let userId = $("#txtUserId").val();
+            let password = $("#txtPassword").val();
+
+            if (userId === "" || password === "") {
+                alert("Please enter User ID and Password");
+                return;
+            }
+
+            $.ajax({
+                type: "POST",
+                url: baseUrl + "/WebServices/UserServices.asmx/Authenticate",
+                contentType: "application/json; charset=utf-8",
+                dataType: "json",
+                data: JSON.stringify({
+                    IP_str_Username: userId,
+                    IP_str_Password: password
+                }),
+                success: function (response) {
+
+                    if (response.d.ResponseCode === 0 && response.d.BResponse === true) {
+
+                        if (response.d.Data.EmployeeCode != $("#employeeCodeHidden").val()) {
+                            alert("You are not authorized to do this action");
+                            return;
+                        }
+
+                        $("#loginSection").hide();
+
+                        $("#actionSectionContainer").html(`
+                                <div class="action-buttons" id="actionSection">
+                                    <p>Please choose an action:</p>
+
+                                    <a href="#" class="btn btn-approve"
+                                       onclick="updatePromotionStatus(2, this); return false;">Approve</a>
+
+                                    <a href="#" class="btn btn-reject"
+                                       onclick="updatePromotionStatus(0, this); return false;">Reject</a>
+                                </div>
+                            `);
+
+                    } else {
+                        alert(response.d.Message || "Authentication failed");
+                    }
+                }
+            });
+        });
+
+        // APPROVE / REJECT
+        function updatePromotionStatus(status, element) {
+
+            $('.btn').css('opacity', '0.5').css('pointer-events', 'none');
+            $(element).text("Processing...");
+
+            $.ajax({
+                type: 'POST',
+                url: baseUrl + '/WebServices/HRIS/IncrementService.asmx/UpdateIncrementStatusForApproverFromMail',
+                data: JSON.stringify({
+                    IP_ui64_incrementCode: incrementCode,
+                    status: status,
+                    employeeCode: $("#employeeCodeHidden").val(),
+                    token: $('#token').val()
+                }),
+                contentType: 'application/json; charset=utf-8',
+                dataType: 'json',
+
+                success: function () {
+                    $(".content").html(`
+                            <div style="text-align:center; padding:40px;">
+                                <h3 style="color:#28a745;">Action Completed</h3>
+                                <p>${status === 2 ? "Approval successful." : "Rejection submitted."}</p>
+                                <p>This window will close automatically in 5 seconds.</p>
+                            </div>
+                        `);
+
+                    setTimeout(() => window.close(), 5000);
+                }
+            });
+        }
+    </script>
+
+</body>
+</html>
